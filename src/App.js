@@ -1,5 +1,15 @@
 import React, { useState, useEffect, useCallback } from 'react';
-import { BookOpen, Brain, Clock, CheckCircle, XCircle, BarChart3, Sparkles, Loader2 } from 'lucide-react';
+// Replace icon library with simple emoji for full offline usage
+const ICONS = {
+  book: '📘',
+  brain: '🧠',
+  clock: '⏰',
+  check: '✔️',
+  x: '✖️',
+  chart: '📊',
+  sparkle: '✨',
+  loader: '⏳'
+};
 
 // Local-only version: no external services
 // --- AWL WORD DATA (Updated with user-provided list) ---
@@ -820,7 +830,7 @@ export default function AWLVocabularyApp() {
     return (
         <div className="flex items-center justify-center min-h-screen bg-gray-100">
             <div className="text-center">
-                <Brain className="w-16 h-16 text-blue-500 mx-auto animate-pulse mb-4" />
+                <div className="text-4xl mb-4">{ICONS.brain}</div>
                 <p className="text-xl font-semibold text-gray-700">Loading your vocabulary workspace...</p>
             </div>
         </div>
@@ -839,7 +849,7 @@ export default function AWLVocabularyApp() {
           <Card>
             <div className="flex items-center justify-between mb-6">
                 <h1 className="text-2xl font-bold text-gray-800 flex items-center gap-2">
-                    <BarChart3 className="text-blue-600" /> İstatistikler
+                    <span className="mr-1">{ICONS.chart}</span> İstatistikler
                 </h1>
                 <Button onClick={() => setCurrentView('study')} variant="outline">Çalışmaya Dön</Button>
             </div>
@@ -890,10 +900,10 @@ export default function AWLVocabularyApp() {
         <Card>
             <div className="flex flex-col sm:flex-row items-start sm:items-center justify-between mb-6 gap-4">
                 <h1 className="text-2xl md:text-3xl font-bold text-gray-800 flex items-center gap-2">
-                    <BookOpen className="text-blue-600" /> AWL Kelime Çalışması
+                    <span className="mr-1">{ICONS.book}</span> AWL Kelime Çalışması
                 </h1>
                 <Button onClick={() => setCurrentView('stats')} variant="outline" className="w-full sm:w-auto">
-                    <BarChart3 className="w-4 h-4 mr-2" /> İstatistikler
+                    <span className="mr-2">{ICONS.chart}</span> İstatistikler
                 </Button>
             </div>
             <div className="mb-6 bg-gray-50 p-4 rounded-lg border">
@@ -905,7 +915,7 @@ export default function AWLVocabularyApp() {
                         </select>
                     </div>
                     <div className="text-sm font-medium text-gray-600 flex items-center gap-2 bg-white px-3 py-2 rounded-full border">
-                        <Clock className="w-4 h-4 text-blue-500" />
+                        <span className="text-blue-500">{ICONS.clock}</span>
                         <span>Çalışılacak: <span className="font-bold text-blue-600">{studyQueue.length}</span> kelime</span>
                     </div>
                 </div>
@@ -941,8 +951,8 @@ export default function AWLVocabularyApp() {
                                 <div className="text-center pt-4">
                                     <p className="mb-4 text-gray-700 font-semibold">Bu kelimeyi doğru bildiniz mi?</p>
                                     <div className="flex gap-4 justify-center">
-                                        <Button onClick={() => handleAnswer(true)} className="bg-green-600 hover:bg-green-700 text-white"><CheckCircle className="w-4 h-4" /> Evet</Button>
-                                        <Button onClick={() => handleAnswer(false)} className="bg-red-600 hover:bg-red-700 text-white"><XCircle className="w-4 h-4" /> Hayır</Button>
+                                        <Button onClick={() => handleAnswer(true)} className="bg-green-600 hover:bg-green-700 text-white"><span className="mr-1">{ICONS.check}</span> Evet</Button>
+                                        <Button onClick={() => handleAnswer(false)} className="bg-red-600 hover:bg-red-700 text-white"><span className="mr-1">{ICONS.x}</span> Hayır</Button>
                                     </div>
                                 </div>
                             </div>
@@ -950,10 +960,10 @@ export default function AWLVocabularyApp() {
 
                         {/* --- Mnemonic Helper --- */}
                         <div className="mt-8 border-t pt-6">
-                            <h3 className="text-center text-lg font-semibold text-gray-700 mb-4 flex items-center justify-center gap-2"><Sparkles className="text-purple-500" /> AI Öğrenme Aracı</h3>
+                            <h3 className="text-center text-lg font-semibold text-gray-700 mb-4 flex items-center justify-center gap-2"><span className="text-purple-500">{ICONS.sparkle}</span> AI Öğrenme Aracı</h3>
                             <div className="flex justify-center">
                                 <Button onClick={generateMnemonic} disabled={isGeneratingMnemonic} variant="secondary" className="flex-1 max-w-xs">
-                                    {isGeneratingMnemonic ? <><Loader2 className="animate-spin mr-2"/> Oluşturuluyor...</> : '✨ Hatırlatıcı Oluştur'}
+                                    {isGeneratingMnemonic ? <><span className="animate-spin mr-2">{ICONS.loader}</span> Oluşturuluyor...</> : '✨ Hatırlatıcı Oluştur'}
                                 </Button>
                             </div>
                             {mnemonicError && <p className="text-red-500 text-sm mt-2 text-center">{mnemonicError}</p>}
@@ -975,7 +985,7 @@ export default function AWLVocabularyApp() {
             ) : (
                  <Card>
                     <CardContent className="text-center py-12">
-                        <Brain className="w-16 h-16 text-gray-300 mx-auto mb-4" />
+                        <div className="text-4xl text-gray-300 mx-auto mb-4">{ICONS.brain}</div>
                         <h3 className="text-xl font-semibold text-gray-700 mb-2">Çalışmaya Hazır!</h3>
                         <p className="text-gray-500 mb-4 max-w-md mx-auto">
                             {studyQueue.length > 0
