@@ -643,7 +643,7 @@ export default function AWLVocabularyApp() {
   const [isResetModalOpen, setIsResetModalOpen] = useState(false);
   const [isLoading, setIsLoading] = useState(true);
 
-  // Gemini API State
+  // Mnemonic generator state
   const [mnemonic, setMnemonic] = useState('');
   const [isGeneratingMnemonic, setIsGeneratingMnemonic] = useState(false);
   const [mnemonicError, setMnemonicError] = useState('');
@@ -721,7 +721,7 @@ export default function AWLVocabularyApp() {
   };
   
   const getNextWord = () => {
-    // Reset Gemini state
+    // Reset mnemonic state
     setMnemonic('');
     setMnemonicError('');
 
@@ -948,7 +948,7 @@ export default function AWLVocabularyApp() {
                             </div>
                         )}
 
-                        {/* --- Gemini AI Features --- */}
+                        {/* --- Mnemonic Helper --- */}
                         <div className="mt-8 border-t pt-6">
                             <h3 className="text-center text-lg font-semibold text-gray-700 mb-4 flex items-center justify-center gap-2"><Sparkles className="text-purple-500" /> AI Öğrenme Aracı</h3>
                             <div className="flex justify-center">
