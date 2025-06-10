@@ -1,11 +1,7 @@
 import React, { useState, useEffect, useCallback } from 'react';
 import { BookOpen, Brain, Clock, CheckCircle, XCircle, BarChart3, Sparkles, Loader2 } from 'lucide-react';
 
-// Firebase Imports
-import { initializeApp } from "firebase/app";
-import { getAuth, signInAnonymously, signInWithCustomToken, onAuthStateChanged } from "firebase/auth";
-import { getFirestore, doc, getDoc, setDoc, onSnapshot, deleteDoc } from "firebase/firestore";
-
+// Local-only version: no external services
 // --- AWL WORD DATA (Updated with user-provided list) ---
 const AWL_WORDS = {
   1: [
@@ -631,11 +627,9 @@ const Progress = ({ value, className = '' }) => (
 
 // --- Main App Component ---
 export default function AWLVocabularyApp() {
-  // Firebase State
-  const [db, setDb] = useState(null);
-  const [auth, setAuth] = useState(null);
-  const [userId, setUserId] = useState(null);
-  const [isAuthReady, setIsAuthReady] = useState(false);
+  // Local storage keys
+  const WORDS_KEY = 'awlWords';
+  const STATS_KEY = 'awlStats';
 
   // App State
   const [currentView, setCurrentView] = useState('study');
@@ -654,39 +648,9 @@ export default function AWLVocabularyApp() {
   const [isGeneratingMnemonic, setIsGeneratingMnemonic] = useState(false);
   const [mnemonicError, setMnemonicError] = useState('');
 
-  const appId = typeof __app_id !== 'undefined' ? __app_id : 'awl-vocab-app';
 
-  // --- Firebase Initialization Effect ---
-  useEffect(() => {
-    try {
-      const firebaseConfig = JSON.parse(typeof __firebase_config !== 'undefined' ? __firebase_config : '{}');
-      const app = initializeApp(firebaseConfig);
-      const firestoreDb = getFirestore(app);
-      const firebaseAuth = getAuth(app);
-      setDb(firestoreDb);
-      setAuth(firebaseAuth);
-
-      onAuthStateChanged(firebaseAuth, async (user) => {
-        if (user) {
-          setUserId(user.uid);
-        } else {
-            if (typeof __initial_auth_token !== 'undefined' && __initial_auth_token) {
-                 await signInWithCustomToken(firebaseAuth, __initial_auth_token);
-            } else {
-                 await signInAnonymously(firebaseAuth);
-            }
-        }
-        setIsAuthReady(true);
-      });
-    } catch (error) {
-      console.error("Firebase initialization failed:", error);
-      setIsLoading(false);
-    }
-  }, []);
-
-  // --- Data Loading and Initialization ---
-  const initializeUserDataInFirestore = useCallback(async (currentUserId) => {
-    if (!db) return;
+  // --- Data Initialization and Loading ---
+  const initializeLocalData = useCallback(() => {
     const initialWordData = {};
     Object.keys(AWL_WORDS).forEach(sublist => {
       AWL_WORDS[sublist].forEach(wordObj => {
@@ -704,69 +668,47 @@ export default function AWLVocabularyApp() {
       });
     });
     const initialStats = { totalStudied: 0, correct: 0, incorrect: 0, streak: 0 };
-    try {
-      const wordDocRef = doc(db, 'artifacts', appId, 'users', currentUserId, 'awlData', 'words');
-      const statsDocRef = doc(db, 'artifacts', appId, 'users', currentUserId, 'awlData', 'stats');
-      await setDoc(wordDocRef, { data: initialWordData });
-      await setDoc(statsDocRef, initialStats);
-    } catch (error) {
-      console.error("Error initializing user data in Firestore:", error);
-    }
-  }, [db, appId]);
+    localStorage.setItem(WORDS_KEY, JSON.stringify(initialWordData));
+    localStorage.setItem(STATS_KEY, JSON.stringify(initialStats));
+    setWordData(initialWordData);
+    setStats(initialStats);
+    updateStudyQueue(initialWordData);
+  }, []);
 
-  // --- Firestore Data Subscription Effect ---
   useEffect(() => {
-    if (!isAuthReady || !db || !userId) return;
+    const storedWords = JSON.parse(localStorage.getItem(WORDS_KEY) || 'null');
+    const storedStats = JSON.parse(localStorage.getItem(STATS_KEY) || 'null');
 
-    setIsLoading(true);
-    const wordDocRef = doc(db, 'artifacts', appId, 'users', userId, 'awlData', 'words');
-    const statsDocRef = doc(db, 'artifacts', appId, 'users', userId, 'awlData', 'stats');
-
-    const unsubscribeWords = onSnapshot(wordDocRef, (docSnap) => {
-      if (docSnap.exists()) {
-        const data = docSnap.data().data;
-        // Data integrity check: ensure new words from code are added to user's data
-        let needsUpdate = false;
-        const allWords = Object.values(AWL_WORDS).flat();
-        allWords.forEach(wordObj => {
-            if (!data[wordObj.word]) {
-                data[wordObj.word] = {
-                    ...wordObj,
-                    sublist: parseInt(Object.keys(AWL_WORDS).find(key => AWL_WORDS[key].some(w => w.word === wordObj.word))),
-                    box: 1, lastReviewed: null, nextReview: new Date().toISOString(),
-                    userTurkishMeaning: '', attempts: 0, correct: 0, learned: false
-                };
-                needsUpdate = true;
-            }
-        });
-        
-        setWordData(data);
-        updateStudyQueue(data);
-        if (needsUpdate) {
-            setDoc(wordDocRef, { data });
+    if (storedWords && storedStats) {
+      let needsSave = false;
+      const allWords = Object.values(AWL_WORDS).flat();
+      allWords.forEach(wordObj => {
+        if (!storedWords[wordObj.word]) {
+          storedWords[wordObj.word] = {
+            ...wordObj,
+            sublist: parseInt(Object.keys(AWL_WORDS).find(key => AWL_WORDS[key].some(w => w.word === wordObj.word))),
+            box: 1,
+            lastReviewed: null,
+            nextReview: new Date().toISOString(),
+            userTurkishMeaning: '',
+            attempts: 0,
+            correct: 0,
+            learned: false
+          };
+          needsSave = true;
         }
-      } else {
-        initializeUserDataInFirestore(userId);
+      });
+      setWordData(storedWords);
+      setStats(storedStats);
+      updateStudyQueue(storedWords);
+      if (needsSave) {
+        localStorage.setItem(WORDS_KEY, JSON.stringify(storedWords));
       }
-      setIsLoading(false);
-    }, (error) => {
-      console.error("Error listening to word data:", error);
-      setIsLoading(false);
-    });
-
-    const unsubscribeStats = onSnapshot(statsDocRef, (docSnap) => {
-      if (docSnap.exists()) {
-        setStats(docSnap.data());
-      }
-    }, (error) => {
-      console.error("Error listening to stats data:", error);
-    });
-
-    return () => {
-      unsubscribeWords();
-      unsubscribeStats();
-    };
-  }, [isAuthReady, db, userId, appId, initializeUserDataInFirestore]);
+    } else {
+      initializeLocalData();
+    }
+    setIsLoading(false);
+  }, [initializeLocalData]);
 
   const updateStudyQueue = (data) => {
     const now = new Date();
@@ -799,45 +741,27 @@ export default function AWLVocabularyApp() {
     setUserAnswer('');
   };
   
-  const generateMnemonic = async () => {
+  const generateMnemonic = () => {
     if (!currentWord) return;
     setIsGeneratingMnemonic(true);
     setMnemonicError('');
     setMnemonic('');
 
-    const prompt = `Create a simple and memorable mnemonic for the English word "${currentWord.word}" to help a Turkish speaker remember its meaning, which is "${currentWord.turkish}". The mnemonic can be in English or a mix of English and Turkish. Make it creative and easy to remember.`;
-
     try {
-        const chatHistory = [{ role: "user", parts: [{ text: prompt }] }];
-        const payload = { contents: chatHistory };
-        const apiKey = "";
-        const apiUrl = `https://generativelanguage.googleapis.com/v1beta/models/gemini-2.0-flash:generateContent?key=${apiKey}`;
-        const response = await fetch(apiUrl, {
-            method: 'POST',
-            headers: { 'Content-Type': 'application/json' },
-            body: JSON.stringify(payload)
-        });
-        
-        if (!response.ok) {
-            throw new Error(`API call failed with status: ${response.status}`);
-        }
-
-        const result = await response.json();
-         if (result.candidates?.[0]?.content?.parts?.[0]?.text) {
-            setMnemonic(result.candidates[0].content.parts[0].text);
-        } else {
-            throw new Error("Invalid response structure from API.");
-        }
+      const first = currentWord.word.slice(0, 3).toUpperCase();
+      const turkishFirst = currentWord.turkish.split(' ')[0];
+      const localMnemonic = `${first} - remember with '${turkishFirst}'`;
+      setMnemonic(localMnemonic);
     } catch (error) {
-        console.error("Error generating mnemonic:", error);
-        setMnemonicError("Hatırlatıcı oluşturulurken bir hata oluştu. Lütfen tekrar deneyin.");
+      console.error('Error generating mnemonic:', error);
+      setMnemonicError('Hatırlatıcı oluşturulamadı.');
     } finally {
-        setIsGeneratingMnemonic(false);
+      setIsGeneratingMnemonic(false);
     }
   };
 
   const handleAnswer = async (correct) => {
-    if (!currentWord || !db || !userId) return;
+    if (!currentWord) return;
     const newWordData = { ...wordData };
     const word = newWordData[currentWord.word];
     const newStats = { ...stats };
@@ -862,34 +786,28 @@ export default function AWLVocabularyApp() {
     setWordData(newWordData);
     setStats(newStats);
     try {
-      const wordDocRef = doc(db, 'artifacts', appId, 'users', userId, 'awlData', 'words');
-      const statsDocRef = doc(db, 'artifacts', appId, 'users', userId, 'awlData', 'stats');
-      await setDoc(wordDocRef, { data: newWordData });
-      await setDoc(statsDocRef, newStats);
-    } catch (error) { console.error("Error updating answer in Firestore:", error); }
+      localStorage.setItem(WORDS_KEY, JSON.stringify(newWordData));
+      localStorage.setItem(STATS_KEY, JSON.stringify(newStats));
+    } catch (error) { console.error("Error saving answer:", error); }
     setTimeout(() => { getNextWord(); }, 1500);
   };
 
   const saveTurkishMeaning = async () => {
-    if (!currentWord || !userAnswer.trim() || !db || !userId) return;
+    if (!currentWord || !userAnswer.trim()) return;
     const newWordData = { ...wordData };
     newWordData[currentWord.word].userTurkishMeaning = userAnswer.trim();
     setWordData(newWordData);
     try {
-        const wordDocRef = doc(db, 'artifacts', appId, 'users', userId, 'awlData', 'words');
-        await setDoc(wordDocRef, { data: newWordData });
+        localStorage.setItem(WORDS_KEY, JSON.stringify(newWordData));
     } catch(error) { console.error("Error saving Turkish meaning: ", error); }
     setShowAnswer(true);
   };
   
   const handleResetProgress = async () => {
-    if (!db || !userId) return;
     setIsLoading(true);
     try {
-      const wordDocRef = doc(db, 'artifacts', appId, 'users', userId, 'awlData', 'words');
-      const statsDocRef = doc(db, 'artifacts', appId, 'users', userId, 'awlData', 'stats');
-      await deleteDoc(wordDocRef);
-      await deleteDoc(statsDocRef);
+      localStorage.removeItem(WORDS_KEY);
+      localStorage.removeItem(STATS_KEY);
     } catch(error) { console.error("Error resetting progress:", error); }
     setIsResetModalOpen(false);
     window.location.reload();
